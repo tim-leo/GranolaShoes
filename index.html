@@ -1,0 +1,94 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Running Shoe Health</title>
+  <style>
+    body { font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; margin: 2rem; max-width: 700px; }
+    h1 { margin-bottom: 0.25rem; }
+    p.muted { color: #555; margin-top: 0; }
+    form { display: grid; gap: 12px; margin-top: 16px; }
+    label { display: grid; gap: 6px; }
+    input, button, select { padding: 10px; font-size: 1rem; }
+    button { cursor: pointer; }
+    .card { border: 1px solid #e5e7eb; border-radius: 12px; padding: 16px; margin-top: 16px; }
+    .error { color: #b91c1c; white-space: pre-wrap; }
+    .footer { margin-top: 24px; font-size: 0.9rem; color: #666; }
+  </style>
+</head>
+<body>
+  <h1>🏃‍♀️ Running Shoe Health</h1>
+  <p class="muted">Enter your name and shoe health (0–100) to get a recommendation.</p>
+
+  <form id="form" novalidate>
+    <label>
+      Owner name
+      <input id="owner" name="owner" placeholder="e.g., Camille" required />
+    </label>
+
+    <label>
+      Health percentage
+      <input id="health" name="health" type="number" min="0" max="100" required />
+    </label>
+
+    <button type="submit">Assess</button>
+  </form>
+
+  <div id="out" class="card" style="display:none;"></div>
+
+  <div class="footer">
+    <small>Made with 💚. This page calls an AWS Lambda Function URL.</small>
+  </div>
+
+  <script>
+    const LAMBDA_URL = "https://sqnohtywiqfclwkg5m2lnrajc40qmujk.lambda-url.us-east-1.on.aws/";
+
+    const form = document.getElementById('form');
+    const out = document.getElementById('out');
+
+    function show(html) {
+      out.style.display = 'block';
+      out.innerHTML = html;
+    }
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      out.style.display = 'none';
+
+      const owner = document.getElementById('owner').value.trim();
+      const healthStr = document.getElementById('health').value.trim();
+
+      // client-side validation
+      if (!owner) return show('<div class="error">Please enter a name.</div>');
+      const hp = Number(healthStr);
+      if (!Number.isFinite(hp) || hp < 0 || hp > 100) {
+        return show('<div class="error">Health percentage must be a number between 0 and 100.</div>');
+      }
+
+      try {
+        const res = await fetch(LAMBDA_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ owner_name: owner, health_percentage: hp })
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) {
+          return show(`<div class="error"><strong>Error:</strong>\n${JSON.stringify(data, null, 2)}</div>`);
+        }
+
+        show(`
+          <h3>📋 Result</h3>
+          <p><strong>Owner:</strong> ${data.owner}</p>
+          <p><strong>Health:</strong> ${data.health_percentage}%</p>
+          <p><strong>Recommendation:</strong> ${data.recommendation}</p>
+        `);
+      } catch (err) {
+        show(`<div class="error"><strong>Network error:</strong> ${err}</div>`);
+      }
+    });
+  </script>
+</body>
+</html>
